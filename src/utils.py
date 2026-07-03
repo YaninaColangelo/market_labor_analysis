@@ -23,11 +23,18 @@ def save_csv(df: pd.DataFrame, path: str | Path) -> None:
     df.to_csv(output_path, index=False, encoding="utf-8")
 
 
+def guardar_csv(df: pd.DataFrame, path: str | Path = DATA_PROCESSED / "oferta_clean.csv") -> None:
+    """Guarda un DataFrame en CSV usando la convencion del proyecto."""
+    save_csv(df, path)
+
+
 def normalize_text(value: object) -> str:
     """Normaliza texto para busquedas simples y reglas de clasificacion."""
     if pd.isna(value):
         return ""
-    return str(value).strip().lower()
+    from src.cleaning import normalizar_texto
+
+    return normalizar_texto(value).lower()
 
 
 def contains_any(text: str, keywords: Iterable[str]) -> bool:
