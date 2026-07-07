@@ -1,6 +1,7 @@
 """Funciones base para recoleccion y consolidacion de ofertas laborales."""
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -25,8 +26,8 @@ RAW_COLUMNS = [
     "formacion_requerida",
 ]
 
-
 RAW_DATASET_PATH = DATA_RAW / "ofertas_brutas.csv"
+ID_OFERTA_PATTERN = re.compile(r"^OF-(\d+)$")
 
 
 def create_empty_raw_template(output_path: str | Path = DATA_RAW / "ofertas_brutas.csv") -> pd.DataFrame:
@@ -49,15 +50,56 @@ def save_raw_dataset(df: pd.DataFrame, output_path: str | Path = RAW_DATASET_PAT
     save_csv(df, output_path)
 
 
-def append_offer(offers: pd.DataFrame, offer: dict) -> pd.DataFrame:
-    """Agrega una oferta cargada manualmente respetando el esquema base."""
-    missing_offer_columns = [column for column in RAW_COLUMNS if column not in offer]
-    if missing_offer_columns:
-        raise ValueError(f"Faltan campos obligatorios en la oferta: {missing_offer_columns}")
-
+def validate_raw_schema(offers: pd.DataFrame) -> None:
+    """Valida que el dataset raw tenga las columnas obligatorias."""
     missing_dataset_columns = [column for column in RAW_COLUMNS if column not in offers.columns]
     if missing_dataset_columns:
         raise ValueError(f"Faltan columnas obligatorias en el dataset raw: {missing_dataset_columns}")
+
+
+def normalize_offer_to_raw_schema(offer: dict) -> dict:
+    """Ordena y completa una oferta segun el esquema raw."""
+    return {column: offer.get(column) for column in RAW_COLUMNS}
+
+
+def next_offer_id(offers: pd.DataFrame, prefix: str = "OF", width: int = 3) -> str:
+    """Genera el siguiente id incremental del dataset raw."""
+    if "id_oferta" not in offers.columns or offers.empty:
+        return f"{prefix}-{1:0{width}d}"
+
+    pattern = re.compile(rf"^{re.escape(prefix)}-(\d+)$")
+
+    numbers = (
+        offers["id_oferta"]
+        .dropna()
+        .astype(str)
+        .str.extract(pattern)[0]
+        .dropna()
+        .astype(int)
+    )
+
+    next_number = 1 if numbers.empty else numbers.max() + 1
+    return f"{prefix}-{next_number:0{width}d}"
+
+
+def assign_offer_id(offers: pd.DataFrame, offer: dict, overwrite: bool = False) -> dict:
+    """Asigna id incremental si la oferta no tiene id o si se pide sobrescribirlo."""
+    offer = offer.copy()
+
+    if overwrite or not offer.get("id_oferta"):
+        offer["id_oferta"] = next_offer_id(offers)
+
+    return offer
+
+
+def append_offer(offers: pd.DataFrame, offer: dict, assign_id: bool = True) -> pd.DataFrame:
+    """Agrega una oferta respetando el esquema base."""
+    validate_raw_schema(offers)
+
+    offer = normalize_offer_to_raw_schema(offer)
+
+    if assign_id:
+        offer = assign_offer_id(offers, offer)
 
     offer_row = pd.DataFrame([offer], columns=RAW_COLUMNS)
     return pd.concat([offers[RAW_COLUMNS], offer_row], ignore_index=True)
