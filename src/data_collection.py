@@ -105,6 +105,22 @@ def append_offer(offers: pd.DataFrame, offer: dict, assign_id: bool = True) -> p
     return pd.concat([offers[RAW_COLUMNS], offer_row], ignore_index=True)
 
 
+def append_offers(offers: pd.DataFrame, new_offers: list[dict], assign_id: bool = True) -> pd.DataFrame:
+    """Agrega multiples ofertas, reemplazando previamente las URLs repetidas."""
+    updated = offers.copy()
+    validate_raw_schema(updated)
+
+    for offer in new_offers:
+        normalized_offer = normalize_offer_to_raw_schema(offer)
+        url = normalized_offer.get("url")
+        if url:
+            updated = updated[updated["url"] != url].copy()
+
+        updated = append_offer(updated, normalized_offer, assign_id=assign_id)
+
+    return updated
+
+
 def append_manual_offer(offers: pd.DataFrame, offer: dict) -> pd.DataFrame:
     """Mantiene compatibilidad con el nombre usado previamente."""
     return append_offer(offers, offer)

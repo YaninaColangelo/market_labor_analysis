@@ -48,7 +48,7 @@ def generar_id(valor: object) -> str:
 
 
 def separar_titulo_ciudad(titulo: object) -> tuple[str, str]:
-    """Separa titulo y ciudad cuando Tecnoempleo los presenta en un mismo texto."""
+    """Separa titulo y ciudad cuando una fuente los presenta en un mismo texto."""
     texto = normalizar_texto(titulo)
     if not texto:
         return "", ""
@@ -79,15 +79,107 @@ def _metadata_como_lista(metadata: Any) -> list[str]:
     return [normalizar_texto(metadata)]
 
 
-def extraer_empresa_meta(metadata: Any) -> str:
-    """Extrae la empresa desde metadatos raw cuando esta disponible."""
+def extraer_valor_meta(metadata: Any, etiquetas: tuple[str, ...]) -> str:
+    """Extrae un valor desde metadata usando etiquetas conocidas."""
     for item in _metadata_como_lista(metadata):
         texto = normalizar_texto(item)
         texto_lower = texto.lower()
-        for etiqueta in ["empresa:", "compania:", "compania", "cliente final:"]:
-            if texto_lower.startswith(etiqueta):
-                return normalizar_texto(texto.split(":", 1)[-1])
+
+        for etiqueta in etiquetas:
+            etiqueta_lower = etiqueta.lower()
+            if texto_lower.startswith(etiqueta_lower):
+                if ":" in texto:
+                    return normalizar_texto(texto.split(":", 1)[-1])
+                return normalizar_texto(texto[len(etiqueta) :])
+
     return ""
+
+
+def extraer_empresa_meta(metadata: Any) -> str:
+    """Extrae la empresa desde metadatos raw cuando esta disponible."""
+    return extraer_valor_meta(metadata, ("empresa:", "compania:", "compania", "cliente final:"))
+
+
+def extraer_modalidad_meta(metadata: Any) -> str:
+    """Extrae modalidad laboral desde metadata cuando esta disponible."""
+    valor = extraer_valor_meta(metadata, ("modalidad:", "teletrabajo:", "tipo jornada:"))
+    if valor:
+        return valor
+
+    texto = " ".join(_metadata_como_lista(metadata)).lower()
+    for modalidad in ("remoto", "hibrido", "híbrido", "presencial"):
+        if modalidad in texto:
+            return "Hibrido" if modalidad == "híbrido" else modalidad.capitalize()
+
+    return ""
+
+
+def extraer_seniority_meta(metadata: Any) -> str:
+    """Extrae seniority o experiencia desde metadata cuando esta disponible."""
+    valor = extraer_valor_meta(metadata, ("seniority:", "experiencia:", "nivel:"))
+    if valor:
+        return valor
+
+    texto = " ".join(_metadata_como_lista(metadata)).lower()
+    patrones = (
+        ("Junior", r"\b(junior|jr)\b"),
+        ("Semi Senior", r"\b(semi senior|semisenior|ssr)\b"),
+        ("Senior", r"\b(senior|sr)\b"),
+    )
+    for etiqueta, patron in patrones:
+        if re.search(patron, texto):
+            return etiqueta
+
+    return ""
+
+
+def extraer_fecha_meta(metadata: Any) -> str:
+    """Extrae fecha de publicacion desde metadata cuando esta disponible."""
+    return extraer_valor_meta(metadata, ("fecha publicacion:", "fecha de publicacion:", "publicado:"))
+
+
+def extraer_fuente_meta(metadata: Any) -> str:
+    """Extrae la fuente desde metadata cuando esta disponible."""
+    return extraer_valor_meta(metadata, ("fuente:", "portal:", "sitio:", "source:"))
+
+
+def extraer_pais_meta(metadata: Any) -> str:
+    """Extrae el pais desde metadata cuando esta disponible."""
+    return extraer_valor_meta(metadata, ("pais:", "country:"))
+
+
+def extraer_responsabilidades_meta(metadata: Any) -> str:
+    """Extrae responsabilidades o detalle de la oferta desde metadata cuando existe."""
+    return extraer_valor_meta(
+        metadata,
+        (
+            "responsabilidades:",
+            "funciones:",
+            "tareas:",
+            "detalle:",
+            "descripcion oferta:",
+        ),
+    )
+
+
+def extraer_formacion_meta(metadata: Any) -> str:
+    """Extrae formacion requerida desde metadata cuando esta disponible."""
+    return extraer_valor_meta(
+        metadata,
+        (
+            "formacion:",
+            "formacion requerida:",
+            "estudios minimos:",
+            "estudios mínimos:",
+            "titulacion:",
+            "titulación:",
+        ),
+    )
+
+
+def extraer_industria_meta(metadata: Any) -> str:
+    """Extrae industria o sector desde metadata cuando esta disponible."""
+    return extraer_valor_meta(metadata, ("industria:", "sector:", "categoria:", "categoría:"))
 
 
 def extraer_herramientas_meta(metadata: Any) -> list[str]:
@@ -101,4 +193,3 @@ def extraer_herramientas_meta(metadata: Any) -> list[str]:
             herramientas.append(herramienta)
 
     return herramientas
-
