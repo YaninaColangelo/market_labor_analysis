@@ -40,6 +40,14 @@ def normalizar_texto(valor: object) -> str:
     return texto
 
 
+def normalizar_para_comparar(valor: object) -> str:
+    """Normaliza texto para comparar etiquetas sin depender de acentos."""
+    texto = normalizar_texto(valor).lower()
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(caracter for caracter in texto if unicodedata.category(caracter) != "Mn")
+    return texto
+
+
 def generar_id(valor: object) -> str:
     """Genera un id estable para una oferta a partir de su URL o contenido."""
     texto = normalizar_texto(valor).lower()
@@ -83,10 +91,10 @@ def extraer_valor_meta(metadata: Any, etiquetas: tuple[str, ...]) -> str:
     """Extrae un valor desde metadata usando etiquetas conocidas."""
     for item in _metadata_como_lista(metadata):
         texto = normalizar_texto(item)
-        texto_lower = texto.lower()
+        texto_lower = normalizar_para_comparar(texto)
 
         for etiqueta in etiquetas:
-            etiqueta_lower = etiqueta.lower()
+            etiqueta_lower = normalizar_para_comparar(etiqueta)
             if texto_lower.startswith(etiqueta_lower):
                 if ":" in texto:
                     return normalizar_texto(texto.split(":", 1)[-1])
@@ -106,10 +114,10 @@ def extraer_modalidad_meta(metadata: Any) -> str:
     if valor:
         return valor
 
-    texto = " ".join(_metadata_como_lista(metadata)).lower()
-    for modalidad in ("remoto", "hibrido", "híbrido", "presencial"):
+    texto = normalizar_para_comparar(" ".join(_metadata_como_lista(metadata)))
+    for modalidad in ("remoto", "hibrido", "presencial"):
         if modalidad in texto:
-            return "Hibrido" if modalidad == "híbrido" else modalidad.capitalize()
+            return "Hibrido" if modalidad == "hibrido" else modalidad.capitalize()
 
     return ""
 
@@ -120,7 +128,7 @@ def extraer_seniority_meta(metadata: Any) -> str:
     if valor:
         return valor
 
-    texto = " ".join(_metadata_como_lista(metadata)).lower()
+    texto = normalizar_para_comparar(" ".join(_metadata_como_lista(metadata)))
     patrones = (
         ("Junior", r"\b(junior|jr)\b"),
         ("Semi Senior", r"\b(semi senior|semisenior|ssr)\b"),
